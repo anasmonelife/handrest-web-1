@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sofa, BedDouble, Shirt, Zap, Wrench, LucideIcon, Check, Plus, Minus } from 'lucide-react';
+import { Sofa, BedDouble, Shirt, Zap, Wrench, Sparkles, Wind, Layers, Fan, Thermometer, LucideIcon, Check, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAddonServices, type AddonService } from '@/hooks/useAddons';
+import { useCustomFeatures, type CustomFeature } from '@/hooks/useCustomFeatures';
 import type { Package } from '@/types/database';
 
 const iconMap: Record<string, LucideIcon> = {
@@ -12,6 +13,11 @@ const iconMap: Record<string, LucideIcon> = {
   shirt: Shirt,
   zap: Zap,
   wrench: Wrench,
+  sparkles: Sparkles,
+  wind: Wind,
+  layers: Layers,
+  fan: Fan,
+  thermometer: Thermometer,
 };
 
 interface AddOnServicesFormProps {
@@ -20,11 +26,13 @@ interface AddOnServicesFormProps {
 }
 
 export function AddOnServicesForm({ pkg, onSubmit }: AddOnServicesFormProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const { data: addons, isLoading } = useAddonServices();
+  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
+  const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
+  const { data: addons, isLoading: addonsLoading } = useAddonServices();
+  const { data: customFeatures, isLoading: featuresLoading } = useCustomFeatures();
 
-  const toggleAddon = (id: string) => {
-    setSelected(prev => {
+  const toggle = (set: Set<string>, setFn: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
+    setFn(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -32,12 +40,14 @@ export function AddOnServicesForm({ pkg, onSubmit }: AddOnServicesFormProps) {
     });
   };
 
-  const addonTotal = addons?.filter(a => selected.has(a.id)).reduce((sum, a) => sum + a.price, 0) ?? 0;
-  const grandTotal = pkg.price + addonTotal;
+  const addonTotal = addons?.filter(a => selectedAddons.has(a.id)).reduce((sum, a) => sum + a.price, 0) ?? 0;
+  const featureTotal = customFeatures?.filter(f => selectedFeatures.has(f.id)).reduce((sum, f) => sum + f.price, 0) ?? 0;
+  const grandTotal = pkg.price + addonTotal + featureTotal;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(Array.from(selected), addonTotal);
+    const allSelected = [...Array.from(selectedAddons), ...Array.from(selectedFeatures)];
+    onSubmit(allSelected, addonTotal + featureTotal);
   };
 
   const getIcon = (iconName: string) => {
@@ -80,25 +90,25 @@ export function AddOnServicesForm({ pkg, onSubmit }: AddOnServicesFormProps) {
 
       {/* Customizable Add-on Services */}
       <div>
-        <h4 className="font-semibold text-foreground mb-1">⚡ Customize your service</h4>
+        <h4 className="font-semibold text-foreground mb-1">⚡ Add-on Services</h4>
         <p className="text-xs text-muted-foreground mb-4">
           Add extra services to your package. Price updates instantly.
         </p>
-        {isLoading ? (
+        {addonsLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />)}
           </div>
         ) : (
           <div className="space-y-3">
             {addons?.map((addon, index) => {
-              const isSelected = selected.has(addon.id);
+              const isSelected = selectedAddons.has(addon.id);
               return (
                 <motion.label
                   key={addon.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  htmlFor={addon.id}
+                  htmlFor={`addon-${addon.id}`}
                   className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                     isSelected
                       ? 'border-secondary bg-secondary/5 shadow-soft'
@@ -106,9 +116,9 @@ export function AddOnServicesForm({ pkg, onSubmit }: AddOnServicesFormProps) {
                   }`}
                 >
                   <Checkbox
-                    id={addon.id}
+                    id={`addon-${addon.id}`}
                     checked={isSelected}
-                    onCheckedChange={() => toggleAddon(addon.id)}
+                    onCheckedChange={() => toggle(selectedAddons, setSelectedAddons, addon.id)}
                   />
                   <span className="text-muted-foreground">{getIcon(addon.icon)}</span>
                   <div className="flex-1 min-w-0">
@@ -132,6 +142,62 @@ export function AddOnServicesForm({ pkg, onSubmit }: AddOnServicesFormProps) {
         )}
       </div>
 
+      {/* Custom Features */}
+      {customFeatures && customFeatures.length > 0 && (
+        <div>
+          <h4 className="font-semibold text-foreground mb-1">🛠️ Custom Features</h4>
+          <p className="text-xs text-muted-foreground mb-4">
+            Pick individual features to add to any package.
+          </p>
+          {featuresLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />)}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {customFeatures.map((feature, index) => {
+                const isSelected = selectedFeatures.has(feature.id);
+                return (
+                  <motion.label
+                    key={feature.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    htmlFor={`feature-${feature.id}`}
+                    className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-secondary bg-secondary/5 shadow-soft'
+                        : 'border-border hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <Checkbox
+                      id={`feature-${feature.id}`}
+                      checked={isSelected}
+                      onCheckedChange={() => toggle(selectedFeatures, setSelectedFeatures, feature.id)}
+                    />
+                    <span className="text-muted-foreground">{getIcon(feature.icon)}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-foreground">{feature.name}</span>
+                      {feature.description && (
+                        <p className="text-xs text-muted-foreground truncate">{feature.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isSelected ? (
+                        <Minus className="w-3 h-3 text-destructive" />
+                      ) : (
+                        <Plus className="w-3 h-3 text-brand-teal" />
+                      )}
+                      <span className="font-semibold text-brand-teal">₹{feature.price}</span>
+                    </div>
+                  </motion.label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Live Price Breakdown */}
       <motion.div
         layout
@@ -143,7 +209,7 @@ export function AddOnServicesForm({ pkg, onSubmit }: AddOnServicesFormProps) {
           <span>₹{pkg.price.toLocaleString()}</span>
         </div>
         <AnimatePresence>
-          {addons?.filter(a => selected.has(a.id)).map(addon => (
+          {addons?.filter(a => selectedAddons.has(a.id)).map(addon => (
             <motion.div
               key={addon.id}
               initial={{ opacity: 0, height: 0 }}
@@ -155,6 +221,20 @@ export function AddOnServicesForm({ pkg, onSubmit }: AddOnServicesFormProps) {
                 <Plus className="w-3 h-3" /> {addon.name}
               </span>
               <span>₹{addon.price.toLocaleString()}</span>
+            </motion.div>
+          ))}
+          {customFeatures?.filter(f => selectedFeatures.has(f.id)).map(feature => (
+            <motion.div
+              key={feature.id}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex justify-between text-sm text-muted-foreground overflow-hidden"
+            >
+              <span className="flex items-center gap-1">
+                <Plus className="w-3 h-3" /> {feature.name}
+              </span>
+              <span>₹{feature.price.toLocaleString()}</span>
             </motion.div>
           ))}
         </AnimatePresence>

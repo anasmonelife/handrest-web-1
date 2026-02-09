@@ -15,7 +15,8 @@ import {
   DollarSign,
   TrendingUp,
   Clock,
-  Puzzle
+  Puzzle,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +44,7 @@ import { useToast } from '@/hooks/use-toast';
 import logo from '@/assets/handrest-logo.jpeg';
 import { PackagesTab } from '@/components/admin/PackagesTab';
 import { AddonsTab } from '@/components/admin/AddonsTab';
+import { CustomFeaturesTab } from '@/components/admin/CustomFeaturesTab';
 import type { BookingStatus } from '@/types/database';
 
 const statusColors: Record<BookingStatus, string> = {
@@ -54,7 +56,7 @@ const statusColors: Record<BookingStatus, string> = {
   cancelled: 'bg-red-100 text-red-800',
 };
 
-type Tab = 'dashboard' | 'bookings' | 'staff' | 'packages' | 'addons' | 'settings';
+type Tab = 'dashboard' | 'bookings' | 'staff' | 'packages' | 'addons' | 'custom_features' | 'settings';
 
 function LoginForm({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
   const [email, setEmail] = useState('');
@@ -416,6 +418,7 @@ export default function AdminDashboard() {
     { id: 'staff', icon: Users, label: 'Staff' },
     { id: 'packages', icon: Package, label: 'Packages' },
     { id: 'addons', icon: Puzzle, label: 'Add-ons' },
+    { id: 'custom_features', icon: Sparkles, label: 'Custom Features' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ] as const;
 
@@ -473,6 +476,7 @@ export default function AdminDashboard() {
         {activeTab === 'staff' && <StaffTab />}
         {activeTab === 'packages' && <PackagesTab />}
         {activeTab === 'addons' && <AddonsTab />}
+        {activeTab === 'custom_features' && <CustomFeaturesTab />}
         {activeTab === 'settings' && (
           <div className="text-center py-12 text-muted-foreground">
             Settings coming soon...
