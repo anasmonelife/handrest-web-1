@@ -119,7 +119,8 @@ export function PermissionManagementTab() {
         />
       </div>
 
-      <Card>
+      {/* Desktop Table */}
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle className="text-lg">All Users & Roles</CardTitle>
         </CardHeader>
@@ -167,6 +168,39 @@ export function PermissionManagementTab() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        <h2 className="text-lg font-semibold">All Users & Roles</h2>
+        {isLoading ? (
+          <p className="text-center py-8 text-muted-foreground">Loading...</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-center py-8 text-muted-foreground">No users found</p>
+        ) : (
+          filtered.map(u => (
+            <Card key={u.role_id}>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">{u.profile?.full_name || 'Unknown'}</p>
+                  <Badge className={roleBadgeColors[u.role]}>
+                    {u.role.replace('_', ' ')}
+                  </Badge>
+                </div>
+                {u.profile?.phone && (
+                  <p className="text-sm text-muted-foreground">📞 {u.profile.phone}</p>
+                )}
+                {u.profile?.email && (
+                  <p className="text-sm text-muted-foreground truncate">✉️ {u.profile.email}</p>
+                )}
+                <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => openChangeDialog(u)}>
+                  <UserCog className="w-4 h-4 mr-1" />
+                  Change Role
+                </Button>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
       <Dialog open={changeDialog.open} onOpenChange={(open) => setChangeDialog({ open, user: open ? changeDialog.user : null })}>
         <DialogContent>
