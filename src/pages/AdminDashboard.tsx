@@ -17,7 +17,8 @@ import {
   Clock,
   Puzzle,
   Sparkles,
-  MapPin
+  MapPin,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +51,7 @@ import { CustomFeaturesTab } from '@/components/admin/CustomFeaturesTab';
 import { PanchayathsTab } from '@/components/admin/PanchayathsTab';
 import { StaffManagementTab } from '@/components/admin/StaffManagementTab';
 import { BookingDetailDialog } from '@/components/admin/BookingDetailDialog';
+import { PermissionManagementTab } from '@/components/admin/PermissionManagementTab';
 import type { Booking, BookingStatus } from '@/types/database';
 
 const statusColors: Record<BookingStatus, string> = {
@@ -61,7 +63,7 @@ const statusColors: Record<BookingStatus, string> = {
   cancelled: 'bg-red-100 text-red-800',
 };
 
-type Tab = 'dashboard' | 'bookings' | 'staff' | 'packages' | 'addons' | 'custom_features' | 'panchayaths' | 'settings';
+type Tab = 'dashboard' | 'bookings' | 'staff' | 'packages' | 'addons' | 'custom_features' | 'panchayaths' | 'permissions' | 'settings';
 
 function LoginForm({ onLogin }: { onLogin: (email: string, password: string, loginType: 'email' | 'mobile') => Promise<void> }) {
   const [loginType, setLoginType] = useState<'email' | 'mobile'>('email');
@@ -448,6 +450,7 @@ export default function AdminDashboard() {
     { id: 'addons', icon: Puzzle, label: 'Add-ons' },
     { id: 'custom_features', icon: Sparkles, label: 'Custom Features' },
     { id: 'panchayaths', icon: MapPin, label: 'Panchayaths' },
+    ...(role === 'super_admin' ? [{ id: 'permissions' as const, icon: Shield, label: 'Permissions' }] : []),
     { id: 'settings', icon: Settings, label: 'Settings' },
   ] as const;
 
@@ -507,6 +510,7 @@ export default function AdminDashboard() {
         {activeTab === 'addons' && <AddonsTab />}
         {activeTab === 'custom_features' && <CustomFeaturesTab />}
         {activeTab === 'panchayaths' && <PanchayathsTab />}
+        {activeTab === 'permissions' && role === 'super_admin' && <PermissionManagementTab />}
         {activeTab === 'settings' && (
           <div className="text-center py-12 text-muted-foreground">
             Settings coming soon...
