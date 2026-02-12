@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar, Clock, MapPin, Phone, Mail, User, Users, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, Phone, Mail, User, Users, AlertCircle, CheckCircle2, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import { useStaffByPanchayath, useAssignStaffToBooking } from '@/hooks/useStaff'
 import { usePanchayaths } from '@/hooks/usePanchayaths';
 import { supabase } from '@/integrations/supabase/client';
 import type { Booking, BookingStatus } from '@/types/database';
+import { useQueryClient } from '@tanstack/react-query';
 
 const statusColors: Record<BookingStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -39,12 +40,15 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
   const updateStatus = useUpdateBookingStatus();
   const assignStaff = useAssignStaffToBooking();
   const { data: panchayaths } = usePanchayaths();
+  const queryClient = useQueryClient();
   
   const [selectedPanchayath, setSelectedPanchayath] = useState<string>('');
   const [reportBefore, setReportBefore] = useState('');
   const [requiredStaffCount, setRequiredStaffCount] = useState(2);
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [lastBookingId, setLastBookingId] = useState<string | null>(null);
+  const [earningPerStaff, setEarningPerStaff] = useState(0);
+  const [finishing, setFinishing] = useState(false);
 
   // Reset and pre-fill when booking changes
   if (booking && booking.id !== lastBookingId) {
@@ -53,6 +57,8 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
     setSelectedStaff([]);
     setReportBefore('');
     setRequiredStaffCount(booking.required_staff_count || 2);
+    setEarningPerStaff(0);
+    setFinishing(false);
   }
 
   const { data: availableStaff } = useStaffByPanchayath(selectedPanchayath || null);
@@ -66,7 +72,6 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
     }
 
     try {
-      // Update booking with panchayath, report_before, staff count
       const { error } = await supabase
         .from('bookings')
         .update({
@@ -79,7 +84,8 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
       
       if (error) throw error;
       
-      toast({ title: 'Booking confirmed with details' });
+      toast({ title: 'Booking confirmed! Staff in this panchayath can now see and accept this job.' });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
       onOpenChange(false);
     } catch {
       toast({ title: 'Failed to confirm booking', variant: 'destructive' });
@@ -102,6 +108,50 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
     }
   };
 
+  const handleFinishJob = async () => {
+    if (earningPerStaff <= 0) {
+      toast({ title: 'Please enter earning amount per staff', variant: 'destructive' });
+      return;
+    }
+
+    setFinishing(true);
+    try {
+      // Get all accepted staff for this booking
+      const { data: assignments, error: aErr } = await supabase
+        .from('booking_staff_assignments')
+        .select('staff_user_id')
+        .eq('booking_id', booking.id)
+        .eq('status', 'accepted');
+
+      if (aErr) throw aErr;
+
+      if (assignments && assignments.length > 0) {
+        // Insert earnings for each staff
+        const earningInserts = assignments.map(a => ({
+          booking_id: booking.id,
+          staff_user_id: a.staff_user_id,
+          amount: earningPerStaff,
+          status: 'pending',
+        }));
+
+        const { error: eErr } = await supabase
+          .from('staff_earnings')
+          .insert(earningInserts);
+
+        if (eErr) throw eErr;
+      }
+
+      toast({ title: 'Job finalized! Earnings recorded for staff.' });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-earnings'] });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: 'Failed to finalize', description: err.message, variant: 'destructive' });
+    } finally {
+      setFinishing(false);
+    }
+  };
+
   const toggleStaff = (staffId: string) => {
     setSelectedStaff(prev => 
       prev.includes(staffId) ? prev.filter(id => id !== staffId) : [...prev, staffId]
@@ -110,6 +160,7 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
 
   const isPending = booking.status === 'pending';
   const isConfirmed = booking.status === 'confirmed';
+  const isCompleted = booking.status === 'completed';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,20 +262,25 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
             </div>
           )}
 
-          {/* Step 2: Assign staff from the same panchayath */}
+          {/* Step 2: Assign staff (optional manual override) */}
           {isConfirmed && (
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                Assign Staff (Need {(booking as any).required_staff_count || 2} staff)
+                Staff Assignment (Need {booking.required_staff_count || 2} staff)
               </h3>
+              
+              <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+                <p className="font-medium">✓ Job is now visible to staff in this panchayath</p>
+                <p className="text-blue-600 mt-1">Staff can self-accept. When {booking.required_staff_count || 2} staff accept, the booking auto-assigns.</p>
+              </div>
 
               {!booking.panchayath_id ? (
-                <p className="text-sm text-muted-foreground">No panchayath set. Go back and confirm with panchayath first.</p>
+                <p className="text-sm text-muted-foreground">No panchayath set.</p>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    Staff available in this panchayath:
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Or manually assign staff:
                   </p>
                   
                   {availableStaff && availableStaff.length > 0 ? (
@@ -259,6 +315,37 @@ export function BookingDetailDialog({ booking, open, onOpenChange }: BookingDeta
                   </Button>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Step 3: Finish completed job and record earnings */}
+          {isCompleted && (
+            <div className="border rounded-lg p-4 space-y-4 border-green-200 bg-green-50/50">
+              <h3 className="font-semibold flex items-center gap-2 text-green-800">
+                <CheckCircle2 className="w-4 h-4" />
+                Finalize Job & Record Earnings
+              </h3>
+
+              <div>
+                <Label>Fixed Earning Per Staff (₹) *</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={earningPerStaff}
+                  onChange={e => setEarningPerStaff(Number(e.target.value))}
+                  placeholder="Enter amount per staff member"
+                />
+              </div>
+
+              <Button 
+                variant="hero" 
+                className="w-full" 
+                onClick={handleFinishJob}
+                disabled={finishing || earningPerStaff <= 0}
+              >
+                <DollarSign className="w-4 h-4 mr-1" />
+                {finishing ? 'Finalizing...' : 'Finish & Record Earnings'}
+              </Button>
             </div>
           )}
         </div>

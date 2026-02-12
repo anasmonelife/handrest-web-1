@@ -21,7 +21,6 @@ export function useStaffList() {
   return useQuery({
     queryKey: ['staff-list'],
     queryFn: async () => {
-      // Get all users with staff role
       const { data: staffRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -32,7 +31,6 @@ export function useStaffList() {
 
       const staffUserIds = staffRoles.map(r => r.user_id);
 
-      // Get profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name, email, phone')
@@ -40,7 +38,6 @@ export function useStaffList() {
       
       if (profilesError) throw profilesError;
 
-      // Get staff details
       const { data: details, error: detailsError } = await supabase
         .from('staff_details')
         .select('user_id, is_available, skills')
@@ -48,7 +45,6 @@ export function useStaffList() {
       
       if (detailsError) throw detailsError;
 
-      // Get panchayath assignments
       const { data: assignments, error: assignError } = await supabase
         .from('staff_panchayath_assignments')
         .select('staff_user_id, panchayath_id, ward_numbers, panchayath:panchayaths(name)')
@@ -56,7 +52,6 @@ export function useStaffList() {
       
       if (assignError) throw assignError;
 
-      // Combine data
       return staffUserIds.map(userId => {
         const profile = profiles?.find(p => p.user_id === userId);
         const detail = details?.find(d => d.user_id === userId);
@@ -115,13 +110,11 @@ export function useAssignStaffToBooking() {
   
   return useMutation({
     mutationFn: async ({ bookingId, staffUserIds }: { bookingId: string; staffUserIds: string[] }) => {
-      // Delete existing assignments
       await supabase
         .from('booking_staff_assignments')
         .delete()
         .eq('booking_id', bookingId);
       
-      // Insert new assignments
       const inserts = staffUserIds.map(staffUserId => ({
         booking_id: bookingId,
         staff_user_id: staffUserId,
@@ -157,6 +150,7 @@ export function useUpdateAssignmentStatus() {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['staff-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['available-jobs'] });
     },
   });
 }
@@ -167,7 +161,6 @@ export function useMyJobs(userId: string | undefined) {
     queryFn: async () => {
       if (!userId) return [];
       
-      // Get assignments for this staff
       const { data: assignments, error: assignError } = await supabase
         .from('booking_staff_assignments')
         .select('id, booking_id, status, assigned_at')
@@ -192,6 +185,119 @@ export function useMyJobs(userId: string | undefined) {
           booking,
         };
       });
+    },
+    enabled: !!userId,
+  });
+}
+
+// New: Fetch confirmed bookings in staff's panchayath that still need staff
+export function useAvailableJobs(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['available-jobs', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+
+      // Get staff's panchayath assignments
+      const { data: myPanchayaths, error: pErr } = await supabase
+        .from('staff_panchayath_assignments')
+        .select('panchayath_id')
+        .eq('staff_user_id', userId);
+
+      if (pErr) throw pErr;
+      if (!myPanchayaths?.length) return [];
+
+      const panchayathIds = myPanchayaths.map(p => p.panchayath_id);
+
+      // Get confirmed bookings in those panchayaths
+      const { data: bookings, error: bErr } = await supabase
+        .from('bookings')
+        .select(`*, package:packages(*, category:service_categories(*))`)
+        .in('panchayath_id', panchayathIds)
+        .in('status', ['confirmed'])
+        .order('scheduled_date', { ascending: true });
+
+      if (bErr) throw bErr;
+      if (!bookings?.length) return [];
+
+      // Check which ones the staff already accepted/applied for
+      const bookingIds = bookings.map(b => b.id);
+      const { data: existingAssignments } = await supabase
+        .from('booking_staff_assignments')
+        .select('booking_id, status')
+        .eq('staff_user_id', userId)
+        .in('booking_id', bookingIds);
+
+      const assignedBookingIds = new Set(existingAssignments?.map(a => a.booking_id) || []);
+
+      // Also get accepted counts for each booking
+      const { data: allAssignments } = await supabase
+        .from('booking_staff_assignments')
+        .select('booking_id, status')
+        .in('booking_id', bookingIds)
+        .eq('status', 'accepted');
+
+      const acceptedCounts: Record<string, number> = {};
+      allAssignments?.forEach(a => {
+        acceptedCounts[a.booking_id] = (acceptedCounts[a.booking_id] || 0) + 1;
+      });
+
+      // Filter out bookings where staff already applied or slots are full
+      return bookings
+        .filter(b => {
+          if (assignedBookingIds.has(b.id)) return false;
+          const accepted = acceptedCounts[b.id] || 0;
+          const required = b.required_staff_count || 2;
+          return accepted < required;
+        })
+        .map(b => ({
+          ...b,
+          accepted_count: acceptedCounts[b.id] || 0,
+        }));
+    },
+    enabled: !!userId,
+    refetchInterval: 30000, // Refresh every 30s for new jobs
+  });
+}
+
+// Staff self-accept: insert into booking_staff_assignments
+export function useAcceptJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ bookingId, staffUserId }: { bookingId: string; staffUserId: string }) => {
+      const { error } = await supabase
+        .from('booking_staff_assignments')
+        .insert({
+          booking_id: bookingId,
+          staff_user_id: staffUserId,
+          status: 'accepted',
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['available-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+  });
+}
+
+// Fetch staff earnings
+export function useMyEarnings(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['my-earnings', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+
+      const { data, error } = await supabase
+        .from('staff_earnings')
+        .select('*')
+        .eq('staff_user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!userId,
   });
