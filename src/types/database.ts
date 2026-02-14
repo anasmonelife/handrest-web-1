@@ -26,6 +26,8 @@ export interface Package {
   features: string[];
   is_active: boolean;
   display_order: number;
+  is_featured: boolean;
+  discount_amount: number;
   created_at: string;
   updated_at: string;
   category?: ServiceCategory;
@@ -98,6 +100,8 @@ export interface Profile {
   email: string;
   phone: string | null;
   avatar_url: string | null;
+  panchayath_id: string | null;
+  ward_number: number | null;
   created_at: string;
   updated_at: string;
 }

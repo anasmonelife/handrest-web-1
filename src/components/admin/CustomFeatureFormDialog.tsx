@@ -4,9 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { useServiceCategories } from '@/hooks/useServices';
+import { useCategoryFeatureMappings, useSetCategoryFeatures } from '@/hooks/useCategoryFeatures';
 import type { CustomFeature } from '@/hooks/useCustomFeatures';
 
 type FormData = Omit<CustomFeature, 'id' | 'created_at' | 'updated_at'>;
@@ -23,6 +26,11 @@ export function CustomFeatureFormDialog({ open, onOpenChange, editing, onSubmit,
   const [form, setForm] = useState<FormData>({
     name: '', description: '', price: 0, icon: 'sparkles', is_active: true, display_order: 0, staff_earning_per_person: 0,
   });
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+
+  const { data: categories } = useServiceCategories();
+  const { data: mappings } = useCategoryFeatureMappings();
+  const setCategoryFeatures = useSetCategoryFeatures();
 
   useEffect(() => {
     if (editing) {
@@ -31,19 +39,42 @@ export function CustomFeatureFormDialog({ open, onOpenChange, editing, onSubmit,
         icon: editing.icon, is_active: editing.is_active, display_order: editing.display_order,
         staff_earning_per_person: editing.staff_earning_per_person,
       });
+      // Load existing category mappings
+      const featureCats = mappings?.filter(m => m.custom_feature_id === editing.id).map(m => m.category_id) ?? [];
+      setSelectedCategories(new Set(featureCats));
     } else {
       setForm({ name: '', description: '', price: 0, icon: 'sparkles', is_active: true, display_order: 0, staff_earning_per_person: 0 });
+      setSelectedCategories(new Set());
     }
-  }, [editing, open]);
+  }, [editing, open, mappings]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const toggleCategory = (catId: string) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(catId)) next.delete(catId); else next.add(catId);
+      return next;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(form);
+    // After the feature is saved, update category mappings
+    if (editing) {
+      try {
+        await setCategoryFeatures.mutateAsync({
+          featureId: editing.id,
+          categoryIds: Array.from(selectedCategories),
+        });
+      } catch (err) {
+        console.error('Failed to update category mappings', err);
+      }
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? 'Edit Custom Feature' : 'Create Custom Feature'}</DialogTitle>
         </DialogHeader>
@@ -71,6 +102,27 @@ export function CustomFeatureFormDialog({ open, onOpenChange, editing, onSubmit,
             <Input type="number" value={form.staff_earning_per_person} onChange={e => setForm(f => ({ ...f, staff_earning_per_person: Number(e.target.value) }))} min={0} />
             <p className="text-xs text-muted-foreground mt-1">Internal: amount each staff earns when this feature is part of a completed job</p>
           </div>
+
+          {/* Category Assignment */}
+          <div>
+            <Label>Applicable Service Categories</Label>
+            <p className="text-xs text-muted-foreground mb-2">Select which divisions this feature applies to. Leave empty for all.</p>
+            <div className="space-y-2">
+              {categories?.map(cat => (
+                <label key={cat.id} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={selectedCategories.has(cat.id)}
+                    onCheckedChange={() => toggleCategory(cat.id)}
+                  />
+                  <span className="text-sm">{cat.name}</span>
+                </label>
+              ))}
+            </div>
+            {!editing && selectedCategories.size > 0 && (
+              <p className="text-xs text-amber-600 mt-1">Category assignments will be saved after creating the feature (edit it after creation).</p>
+            )}
+          </div>
+
           <div>
             <Label>Display Order</Label>
             <Input type="number" value={form.display_order} onChange={e => setForm(f => ({ ...f, display_order: Number(e.target.value) }))} />

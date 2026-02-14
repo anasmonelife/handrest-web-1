@@ -48,6 +48,8 @@ export function PackageFormDialog({
     features: [],
     is_active: true,
     display_order: 0,
+    is_featured: false,
+    discount_amount: 0,
   });
   const [featuresText, setFeaturesText] = useState('');
 
@@ -64,6 +66,8 @@ export function PackageFormDialog({
         features: editingPackage.features,
         is_active: editingPackage.is_active,
         display_order: editingPackage.display_order,
+        is_featured: editingPackage.is_featured,
+        discount_amount: editingPackage.discount_amount,
       });
       setFeaturesText(editingPackage.features.join('\n'));
     } else {
@@ -78,6 +82,8 @@ export function PackageFormDialog({
         features: [],
         is_active: true,
         display_order: 0,
+        is_featured: false,
+        discount_amount: 0,
       });
       setFeaturesText('');
     }
@@ -153,6 +159,19 @@ export function PackageFormDialog({
             <Label>Features (one per line)</Label>
             <Textarea value={featuresText} onChange={e => setFeaturesText(e.target.value)} rows={5} placeholder="Feature 1&#10;Feature 2&#10;Feature 3" />
           </div>
+
+          <div className="flex items-center gap-2">
+            <Switch checked={form.is_featured} onCheckedChange={v => setForm(f => ({ ...f, is_featured: v }))} />
+            <Label>Featured (show as banner)</Label>
+          </div>
+
+          {form.is_featured && (
+            <div>
+              <Label>Discount Amount (₹)</Label>
+              <Input type="number" value={form.discount_amount} onChange={e => setForm(f => ({ ...f, discount_amount: Number(e.target.value) }))} min={0} />
+              <p className="text-xs text-muted-foreground mt-1">This package will appear as a promotional banner on the customer home screen</p>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <Switch checked={form.is_active} onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))} />

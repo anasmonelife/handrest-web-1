@@ -13,6 +13,8 @@ export interface PackageFormData {
   features: string[];
   is_active: boolean;
   display_order: number;
+  is_featured: boolean;
+  discount_amount: number;
 }
 
 export function useCreatePackage() {

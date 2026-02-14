@@ -121,6 +121,23 @@ export function useUpdateBookingStatus() {
   });
 }
 
+export function useCustomerBookings() {
+  return useQuery({
+    queryKey: ['customer-bookings'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('customer_user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as Booking[];
+    },
+  });
+}
+
 export function useBookingByNumber(bookingNumber: string) {
   return useQuery({
     queryKey: ['booking-number', bookingNumber],

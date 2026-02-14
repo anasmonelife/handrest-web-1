@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAddonServices } from '@/hooks/useAddons';
 import { useCustomFeatures } from '@/hooks/useCustomFeatures';
+import { useCategoryFeatureMappings } from '@/hooks/useCategoryFeatures';
 
 const MINIMUM_ORDER = 500;
 
@@ -23,14 +24,25 @@ const iconMap: Record<string, LucideIcon> = {
 
 interface BuildServiceFormProps {
   categoryName?: string;
+  categoryId?: string;
   onSubmit: (selectedFeatureIds: string[], selectedAddonIds: string[], totalPrice: number) => void;
 }
 
-export function BuildServiceForm({ categoryName, onSubmit }: BuildServiceFormProps) {
+export function BuildServiceForm({ categoryName, categoryId, onSubmit }: BuildServiceFormProps) {
   const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
   const { data: addons, isLoading: addonsLoading } = useAddonServices();
-  const { data: customFeatures, isLoading: featuresLoading } = useCustomFeatures();
+  const { data: allCustomFeatures, isLoading: featuresLoading } = useCustomFeatures();
+  const { data: mappings } = useCategoryFeatureMappings();
+
+  // Filter features by category if a category is selected
+  const customFeatures = allCustomFeatures?.filter(f => {
+    if (!categoryId || !mappings) return true; // show all if no category
+    // If this feature has no mappings at all, show it everywhere
+    const featureMappings = mappings.filter(m => m.custom_feature_id === f.id);
+    if (featureMappings.length === 0) return true;
+    return featureMappings.some(m => m.category_id === categoryId);
+  });
 
   const toggle = (set: Set<string>, setFn: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
     setFn(prev => {

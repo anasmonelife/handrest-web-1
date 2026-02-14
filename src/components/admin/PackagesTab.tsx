@@ -98,12 +98,22 @@ export function PackagesTab() {
               <TableBody>
                 {packages?.filter(p => p.category_id === category.id).map(pkg => (
                   <TableRow key={pkg.id}>
-                    <TableCell className="font-medium">{pkg.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {pkg.name}
+                      {pkg.is_featured && (
+                        <Badge className="ml-2 bg-amber-100 text-amber-800 text-xs">Banner</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="max-w-xs truncate">{pkg.description}</TableCell>
                     <TableCell>{pkg.duration_hours}h</TableCell>
                     <TableCell>{pkg.min_staff}</TableCell>
                     <TableCell>{pkg.max_sqft ? `${pkg.max_sqft} sq.ft` : 'Unlimited'}</TableCell>
-                    <TableCell className="font-semibold">₹{pkg.price.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">
+                      ₹{pkg.price.toLocaleString()}
+                      {pkg.discount_amount > 0 && (
+                        <span className="text-xs text-green-600 ml-1">(-₹{pkg.discount_amount})</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge className={pkg.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
                         {pkg.is_active ? 'Active' : 'Inactive'}

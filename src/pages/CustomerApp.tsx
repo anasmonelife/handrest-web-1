@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Sparkles, Search, LogOut } from 'lucide-react';
+import { ArrowLeft, Sparkles, Search, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SplashScreen } from '@/components/customer/SplashScreen';
 import { ServiceCard } from '@/components/customer/ServiceCard';
-import { QuickCleanBanner } from '@/components/customer/QuickCleanBanner';
+import { FeaturedBanners } from '@/components/customer/FeaturedBanners';
 import { BuildServiceForm } from '@/components/customer/BuildServiceForm';
 import { BookingForm, BookingFormData } from '@/components/customer/BookingForm';
+import { CustomerProfile } from '@/components/customer/CustomerProfile';
 import { useServiceCategories } from '@/hooks/useServices';
 import { useCreateBooking } from '@/hooks/useBookings';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import logo from '@/assets/handrest-logo.jpeg';
 import type { ServiceCategory } from '@/types/database';
 
-type Screen = 'splash' | 'home' | 'build_service' | 'booking' | 'confirmation';
+type Screen = 'splash' | 'home' | 'build_service' | 'booking' | 'confirmation' | 'profile';
 
 export default function CustomerApp() {
   const [screen, setScreen] = useState<Screen>('splash');
@@ -45,8 +46,8 @@ export default function CustomerApp() {
     setScreen('booking');
   };
 
-  const handleQuickClean = () => {
-    // Go directly to build service without a category filter
+  const handleFeaturedPackageSelect = (packageId: string) => {
+    // Go to build service - no category filter for featured
     setSelectedCategory(null);
     setScreen('build_service');
   };
@@ -96,6 +97,19 @@ export default function CustomerApp() {
       setSelectedAddonIds([]);
       setBookingNumber('');
       setScreen('home');
+    } else if (screen === 'profile') {
+      setScreen('home');
+    }
+  };
+
+  const screenTitle = () => {
+    switch (screen) {
+      case 'home': return 'HandRest';
+      case 'build_service': return selectedCategory?.name || 'Build Your Service';
+      case 'booking': return 'Book Service';
+      case 'confirmation': return 'Booking Confirmed';
+      case 'profile': return 'My Account';
+      default: return '';
     }
   };
 
@@ -121,15 +135,19 @@ export default function CustomerApp() {
               )}
 
               <h1 className="text-lg font-semibold text-brand-navy">
-                {screen === 'home' && 'HandRest'}
-                {screen === 'build_service' && (selectedCategory?.name || 'Build Your Service')}
-                {screen === 'booking' && 'Book Service'}
-                {screen === 'confirmation' && 'Booking Confirmed'}
+                {screenTitle()}
               </h1>
 
-              <Button variant="ghost" size="icon" onClick={() => signOut()} className="text-muted-foreground">
-                <LogOut className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {screen === 'home' && (
+                  <Button variant="ghost" size="icon" onClick={() => setScreen('profile')}>
+                    <User className="w-5 h-5" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" onClick={() => signOut()} className="text-muted-foreground">
+                  <LogOut className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
           </header>
 
@@ -148,7 +166,8 @@ export default function CustomerApp() {
                   </p>
                 </div>
 
-                <QuickCleanBanner onTryNow={handleQuickClean} />
+                {/* Featured Package Banners */}
+                <FeaturedBanners onSelectPackage={handleFeaturedPackageSelect} />
 
                 <div className="bg-card rounded-xl p-4 shadow-soft">
                   <h3 className="font-semibold text-foreground mb-3">Track Your Booking</h3>
@@ -193,6 +212,7 @@ export default function CustomerApp() {
             {screen === 'build_service' && (
               <BuildServiceForm
                 categoryName={selectedCategory?.name}
+                categoryId={selectedCategory?.id}
                 onSubmit={handleBuildServiceSubmit}
               />
             )}
@@ -240,6 +260,9 @@ export default function CustomerApp() {
                 </Button>
               </motion.div>
             )}
+
+            {/* Profile Screen */}
+            {screen === 'profile' && <CustomerProfile />}
           </main>
 
           {screen === 'home' && (

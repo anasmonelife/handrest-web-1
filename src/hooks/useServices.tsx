@@ -40,6 +40,22 @@ export function usePackages(categoryId?: string) {
   });
 }
 
+export function useFeaturedPackages() {
+  return useQuery({
+    queryKey: ['packages', 'featured'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*, category:service_categories(*)')
+        .eq('is_active', true)
+        .eq('is_featured', true)
+        .order('display_order');
+      if (error) throw error;
+      return data as Package[];
+    },
+  });
+}
+
 export function usePackage(packageId: string) {
   return useQuery({
     queryKey: ['package', packageId],

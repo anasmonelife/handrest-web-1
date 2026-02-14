@@ -211,6 +211,42 @@ export type Database = {
           },
         ]
       }
+      category_feature_mappings: {
+        Row: {
+          category_id: string
+          created_at: string
+          custom_feature_id: string
+          id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          custom_feature_id: string
+          id?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          custom_feature_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_feature_mappings_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "category_feature_mappings_custom_feature_id_fkey"
+            columns: ["custom_feature_id"]
+            isOneToOne: false
+            referencedRelation: "custom_features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_features: {
         Row: {
           created_at: string
@@ -255,11 +291,13 @@ export type Database = {
           category_id: string
           created_at: string
           description: string | null
+          discount_amount: number
           display_order: number
           duration_hours: number
           features: string[]
           id: string
           is_active: boolean
+          is_featured: boolean
           max_sqft: number | null
           min_staff: number
           name: string
@@ -270,11 +308,13 @@ export type Database = {
           category_id: string
           created_at?: string
           description?: string | null
+          discount_amount?: number
           display_order?: number
           duration_hours?: number
           features?: string[]
           id?: string
           is_active?: boolean
+          is_featured?: boolean
           max_sqft?: number | null
           min_staff?: number
           name: string
@@ -285,11 +325,13 @@ export type Database = {
           category_id?: string
           created_at?: string
           description?: string | null
+          discount_amount?: number
           display_order?: number
           duration_hours?: number
           features?: string[]
           id?: string
           is_active?: boolean
+          is_featured?: boolean
           max_sqft?: number | null
           min_staff?: number
           name?: string
